@@ -191,8 +191,8 @@ with gr.Blocks(title="Generational Kitchen Wealth") as demo:
     gr.HTML("""
     <div class="made-with">Powered by
       <span class="chip">Saaras · speech &amp; language ID</span>
-      <span class="chip">sarvam-105b · recipe writing</span>
-      <span class="chip">Sarvam Translate</span>
+      <span class="chip">sarvam-105b-conversations · recipe writing</span>
+      <span class="chip">Mayura · translation</span>
       <span class="chip">Voice cloning · Bulbul</span>
     </div>
     """)

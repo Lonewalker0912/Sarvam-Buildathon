@@ -27,8 +27,8 @@ Many family recipes are not written. They are only in the memory of the elders. 
 
 ```
 Audio --> Saaras (speech to text, language ID)
-      --> sarvam-105b (recipe card as JSON)
-      --> Sarvam Translate (grandchild's language)
+      --> sarvam-105b-conversations (recipe card as JSON)
+      --> Mayura (grandchild's language)
       --> Voice cloning (grandparent's voice)
           or Bulbul TTS (if voice cloning is not available)
       --> Audio
@@ -37,16 +37,17 @@ Audio --> Saaras (speech to text, language ID)
 | Step | Sarvam API | Function in `pipeline.py` |
 |---|---|---|
 | Speech to text and language identification | Saaras (`saaras:v3`) | `transcribe` |
-| Recipe card | `sarvam-105b` | `structure` |
-| Translation | Sarvam Translate (`sarvam-translate:v1`) | `translate` |
+| Recipe card | `sarvam-105b-conversations` | `structure` |
+| Translation | Mayura (`mayura:v1`), with `sarvam-translate:v1` as fallback | `translate` |
 | Speech in the voice of the grandparent | Voice cloning | `speak` |
-| Speech with a standard voice (fallback) | Bulbul (`bulbul:v3`) | `speak` |
+| Speech with a standard voice (fallback) | Bulbul (`bulbul:v3`, voice `kavitha`) | `speak` |
 
 ### Design decisions
 
 - **Language identification at no extra cost.** Saaras gives the language with the transcript. The application does not make a separate API call for the language.
 - **Audio chunks.** The Saaras REST API accepts clips shorter than 30 seconds. The application cuts the recording into chunks. The first chunk is 15 seconds. The other chunks are 25 seconds.
 - **Voice reference.** The application uses the first chunk as the voice reference for voice cloning. Thus, the first 15 seconds must have clear speech.
+- **Natural translation.** Mayura translates in the `classic-colloquial` mode. Thus, the translation sounds like a grandparent. It does not sound like a formal document.
 - **Fallback.** Voice cloning is a beta API. If voice cloning fails, the application uses a standard Bulbul voice.
 - **Cache.** The application keeps each result in the `cache/` folder. If you use the same recording again, the application does not use API credits.
 
