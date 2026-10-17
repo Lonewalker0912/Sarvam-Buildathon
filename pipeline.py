@@ -47,7 +47,7 @@ LANGUAGES = {
 LANGUAGE_NAMES = {code: name for name, code in LANGUAGES.items()}
 
 # Fallback Bulbul voices (used only if voice cloning fails)
-FALLBACK_SPEAKER = "anushka"
+FALLBACK_SPEAKER = "kavitha"
 
 
 def _load_env():
@@ -143,7 +143,7 @@ Return ONLY a JSON object with these keys:
 - "story": 1-3 sentences about any memory or story they shared, or "" if none
 - "narration": a warm spoken version of the recipe for a grandchild, written in English in
   the grandparent's own first-person voice ("Kanna, first take..."). Include ingredients and
-  steps. Plain sentences only, no lists or symbols. At most 1200 characters.
+  steps. Plain sentences only, no lists or symbols. At most 900 characters.
 
 Do not invent ingredients or steps that are not in the transcript.
 
@@ -160,32 +160,49 @@ def _parse_json(text: str) -> dict:
 
 
 def structure(client: SarvamAI, transcript: str, language: str) -> dict:
-    res = client.chat.completions(
-        model="sarvam-105b",
-        messages=[{
-            "role": "user",
-            "content": STRUCTURE_PROMPT.format(
-                language=LANGUAGE_NAMES.get(language, "an Indian language"),
-                transcript=transcript,
-            ),
-        }],
-        temperature=0.3,
-        response_format={"type": "json_object"},
+    # sarvam-105b (the reasoning model) spent its whole token budget thinking
+    # and returned nothing; the conversations model answers directly in ~2s.
+    prompt = STRUCTURE_PROMPT.format(
+        language=LANGUAGE_NAMES.get(language, "an Indian language"),
+        transcript=transcript,
     )
-    return _parse_json(res.choices[0].message.content)
+    last_error = None
+    for _ in range(2):  # one retry if the JSON comes back malformed
+        res = client.chat.completions(
+            model="sarvam-105b-conversations",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3,
+            max_tokens=2048,
+            response_format={"type": "json_object"},
+        )
+        choice = res.choices[0]
+        if not choice.message.content:
+            last_error = f"empty reply (finish_reason={choice.finish_reason})"
+            continue
+        try:
+            return _parse_json(choice.message.content)
+        except ValueError as e:  # json.JSONDecodeError is a ValueError
+            last_error = str(e)
+    raise RuntimeError(f"Could not write the recipe card: {last_error}. Please try again.")
 
 
 def translate(client: SarvamAI, text: str, target: str) -> str:
     if target == "en-IN":
         return text
-    res = client.text.translate(
-        input=text[:2000],
-        source_language_code="en-IN",
-        target_language_code=target,
-        model="sarvam-translate:v1",
-        mode="modern-colloquial",
-    )
-    return res.translated_text
+    # Mayura classic-colloquial sounds like a grandparent (modern-colloquial came
+    # out as heavy Hinglish), but only takes up to 1000 chars; sarvam-translate is formal-only.
+    if len(text) <= 1000:
+        try:
+            return client.text.translate(
+                input=text, source_language_code="en-IN", target_language_code=target,
+                model="mayura:v1", mode="classic-colloquial",
+            ).translated_text
+        except Exception as e:
+            print(f"[translate] mayura failed, falling back to sarvam-translate: {e}")
+    return client.text.translate(
+        input=text[:2000], source_language_code="en-IN", target_language_code=target,
+        model="sarvam-translate:v1", mode="formal",
+    ).translated_text
 
 
 def speak(client: SarvamAI, text: str, target: str, ref_wav: bytes, ref_text: str) -> tuple[bytes, str]:
@@ -218,7 +235,8 @@ def run(samples: np.ndarray, sr: int, target: str, log=print) -> dict:
     samples = to_mono_int16(samples)
     if len(samples) > MAX_SEC * sr:
         raise ValueError(f"Please keep the recording under {MAX_SEC} seconds.")
-    key = hashlib.sha256(samples.tobytes() + target.encode()).hexdigest()[:16]
+    audio_key = hashlib.sha256(samples.tobytes()).hexdigest()[:16]
+    key = f"{audio_key}-{target}"
     cached = CACHE_DIR / f"{key}.json"
     if cached.exists():
         log("Loaded from cache (no credits used)")
@@ -229,13 +247,26 @@ def run(samples: np.ndarray, sr: int, target: str, log=print) -> dict:
     if not chunks:
         raise ValueError("Recording is too short.")
 
-    log(f"Transcribing {len(chunks)} chunk(s)...")
-    heard = transcribe(client, chunks)
+    # Cache the transcript on its own so a failure in a later stage
+    # does not pay for speech-to-text again on retry
+    CACHE_DIR.mkdir(exist_ok=True)
+    heard_cache = CACHE_DIR / f"{audio_key}.heard.json"
+    if heard_cache.exists():
+        heard = json.loads(heard_cache.read_text())
+    else:
+        log(f"Transcribing {len(chunks)} chunk(s)...")
+        heard = transcribe(client, chunks)
+        heard_cache.write_text(json.dumps(heard, ensure_ascii=False))
     log(f"Detected {LANGUAGE_NAMES.get(heard['language'], heard['language'])} "
         f"({heard['language_confidence']:.0%})")
 
-    log("Writing recipe card...")
-    card = structure(client, heard["transcript"], heard["language"])
+    card_cache = CACHE_DIR / f"{audio_key}.card.json"
+    if card_cache.exists():
+        card = json.loads(card_cache.read_text())
+    else:
+        log("Writing recipe card...")
+        card = structure(client, heard["transcript"], heard["language"])
+        card_cache.write_text(json.dumps(card, ensure_ascii=False))
 
     log(f"Translating to {LANGUAGE_NAMES[target]}...")
     narration = translate(client, card.get("narration", ""), target)
@@ -243,7 +274,6 @@ def run(samples: np.ndarray, sr: int, target: str, log=print) -> dict:
     log("Speaking it back...")
     audio, voice = speak(client, narration, target, chunks[0], heard["first_chunk_text"])
 
-    CACHE_DIR.mkdir(exist_ok=True)
     audio_path = CACHE_DIR / f"{key}.wav"
     audio_path.write_bytes(audio)
     result = {**heard, "card": card, "narration_translated": narration,
