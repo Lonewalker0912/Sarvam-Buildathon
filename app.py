@@ -172,8 +172,8 @@ with gr.Blocks(title="Generational Kitchen Wealth") as demo:
     with gr.Row(equal_height=False):
         with gr.Column(scale=5):
             gr.HTML('<div class="panel-title">Tell the recipe</div>'
-                    '<div class="hint">Speak naturally. The first 15 seconds are used to learn the voice, '
-                    'so start with clear speech.</div>')
+                    '<div class="hint">Speak naturally, for up to 90 seconds. The first 15 seconds are used '
+                    'to learn the voice, so start with clear speech.</div>')
             audio_in = gr.Audio(sources=["microphone", "upload"], type="numpy", show_label=False)
             target = gr.Dropdown(list(LANGUAGES), value="English", label="Who is it for? Pick the grandchild's language")
             go = gr.Button("✨ Preserve this recipe", variant="primary", elem_id="go-btn")
@@ -220,4 +220,5 @@ THEME = gr.themes.Base(
 )
 
 if __name__ == "__main__":
+    demo.queue(default_concurrency_limit=2)
     demo.launch(theme=THEME, css=CSS, head=HEAD, js=FORCE_LIGHT)

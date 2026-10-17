@@ -28,6 +28,8 @@ CACHE_DIR = ROOT / "cache"
 # voice-cloning reference, so keep it short; the rest can be longer.
 FIRST_CHUNK_SEC = 15
 CHUNK_SEC = 25
+# The public demo spends real credits, so cap the recording length
+MAX_SEC = 90
 
 LANGUAGES = {
     "English": "en-IN",
@@ -214,6 +216,8 @@ def speak(client: SarvamAI, text: str, target: str, ref_wav: bytes, ref_text: st
 
 def run(samples: np.ndarray, sr: int, target: str, log=print) -> dict:
     samples = to_mono_int16(samples)
+    if len(samples) > MAX_SEC * sr:
+        raise ValueError(f"Please keep the recording under {MAX_SEC} seconds.")
     key = hashlib.sha256(samples.tobytes() + target.encode()).hexdigest()[:16]
     cached = CACHE_DIR / f"{key}.json"
     if cached.exists():
