@@ -63,18 +63,29 @@ Audio --> Saaras (speech to text, language ID)
    git clone https://github.com/Lonewalker0912/Sarvam-Buildathon.git
    cd Sarvam-Buildathon
    ```
-2. Install ffmpeg. On Ubuntu, use this command:
-   ```
-   sudo apt install -y ffmpeg
-   ```
+2. Install ffmpeg. Use the command for your operating system:
+
+   | Operating system | Command |
+   |---|---|
+   | Ubuntu or Debian | `sudo apt install -y ffmpeg` |
+   | macOS (with Homebrew) | `brew install ffmpeg` |
+   | Windows | `winget install ffmpeg` |
+
+   On Windows, close and open the terminal again after the installation.
 3. Make a virtual environment:
-   ```
-   python3 -m venv .venv
-   ```
+
+   | Operating system | Command |
+   |---|---|
+   | Linux or macOS | `python3 -m venv .venv` |
+   | Windows | `python -m venv .venv` |
+
 4. Install the Python packages:
-   ```
-   .venv/bin/pip install -r requirements.txt
-   ```
+
+   | Operating system | Command |
+   |---|---|
+   | Linux or macOS | `.venv/bin/pip install -r requirements.txt` |
+   | Windows | `.venv\Scripts\pip install -r requirements.txt` |
+
 5. Make a file with the name `.env` in the project folder.
 6. Write your API key in the `.env` file:
    ```
@@ -82,6 +93,19 @@ Audio --> Saaras (speech to text, language ID)
    ```
 
 > **CAUTION:** Do not commit the `.env` file. The `.gitignore` file prevents this. Do not write the API key in the code.
+
+> **NOTE:** The `requirements.txt` file gives the package versions that we tested. Do not change these versions.
+
+## Python command for each operating system
+
+The commands in the sections that follow use the Linux and macOS path. On Windows, use a different path:
+
+| Operating system | Python command |
+|---|---|
+| Linux or macOS | `.venv/bin/python` |
+| Windows | `.venv\Scripts\python` |
+
+For example, on Windows, use `.venv\Scripts\python app.py`.
 
 ## Test the API key
 
@@ -117,6 +141,10 @@ You can also process a 16-bit WAV file without the web page:
 ```
 
 The second argument is the language of the grandchild. If you do not give this argument, the application uses English.
+
+## Voice cloning availability
+
+Voice cloning is a beta API. It is possibly not available on your Sarvam account. In this condition, the application uses a standard Bulbul voice. The recipe card and the translation operate normally.
 
 ## Recommendations for good results
 
